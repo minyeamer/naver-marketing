@@ -6,7 +6,8 @@ from playwright.sync_api import TimeoutError as PlaywrightTimeoutError
 from core.login import NaverLoginError
 from core.login import WarningAccountError, ReCaptchaRequiredError, NaverLoginFailedError
 
-from core.action import CafeNotFoundError, CafeNotLoadedError, CafeBannedError, Wpm, ActionLog
+from core.action import CafeNotFoundError, CafeNotLoadedError, CafeBannedError, Wpm
+from core.action import ActionLog, TotalCount, TodayCount
 from core.action import goto_cafe_home, goto_cafe, goto_menu, goto_cafe_url, return_to_cafe_home
 from core.action import goto_article, explore_articles
 from core.action import reload_articles, next_articles, go_back, copy_article_url
@@ -293,12 +294,12 @@ class ConfigWrapper(AttrDict):
             self.counter[key] = 0
 
     def qualify(self):
-        if self.__status["qualified"] == False:
+        if self.__status["qualified"] is False:
             self.reset_counter("article")
         self.__status["qualified"] = True
 
     def disqualify(self):
-        if self.__status["qualified"] != False:
+        if self.__status["qualified"] is not False:
             self.zero_counter("article")
         self.__status["qualified"] = False
 
@@ -977,14 +978,13 @@ class Farmer(BrowserController):
         action_log = read_action_log(self.page, total_only, self.log.my_articles, **self.delays2)
         total, today = action_log["total"], action_log["today"]
 
-        self.config.log.user_info["total"] = total
+        self.sync_action_log(total, None if total_only else today)
 
         for key, count in action_log["total"].items():
             if self.config.limit.get(key):
                 qualified &= (self.config.limit[key] <= count)
 
         if not total_only:
-            self.config.log.user_info["today"] = today
             for key in ["article", "comment"]:
                 daily_limit = self.config.limit[f"daily_{key}"]
                 if daily_limit and (daily_limit <= today[key]):
@@ -993,6 +993,14 @@ class Farmer(BrowserController):
                     self.config.timer.set_timer(key, today[f"last_{key}_ts"])
 
         return qualified
+
+    def sync_action_log(self, total: TotalCount, today: TodayCount | None = None):
+        group_key = (self.config.userid, self.config.cafe.dst.name)
+        for config in self.configs:
+            if (config.userid, config.cafe.dst.name) == group_key:
+                config.log.user_info["total"] = total.copy()
+                if today is not None:
+                    config.log.user_info["today"] = today.copy()
 
     def read_my_articles(self, n: int = 10) -> list[ArticleInfo]:
         open_info(self.page, **self.delays2)
