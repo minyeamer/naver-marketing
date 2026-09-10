@@ -978,13 +978,19 @@ class Farmer(BrowserController):
         action_log = read_action_log(self.page, total_only, self.log.my_articles, **self.delays2)
         total, today = action_log["total"], action_log["today"]
 
-        self.sync_action_log(total, None if total_only else today)
+        if today is not None:
+            group_key = (self.config.userid, self.config.cafe.dst.name)
+            confirmed_articles = sum(len(config.log.written_articles) for config in self.configs
+                if (config.userid, config.cafe.dst.name) == group_key)
+            today["article"] = max(today["article"], confirmed_articles)
+
+        self.sync_action_log(total, today)
 
         for key, count in action_log["total"].items():
             if self.config.limit.get(key):
                 qualified &= (self.config.limit[key] <= count)
 
-        if not total_only:
+        if today is not None:
             for key in ["article", "comment"]:
                 daily_limit = self.config.limit[f"daily_{key}"]
                 if daily_limit and (daily_limit <= today[key]):

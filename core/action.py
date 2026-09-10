@@ -73,7 +73,7 @@ class TodayCount(TypedDict):
 
 class ActionLog(TypedDict):
     total: TotalCount
-    today: TodayCount
+    today: TodayCount | None
 
 
 class CafeNotFoundError(RuntimeError):
@@ -704,21 +704,20 @@ def read_action_log(
                 for span in locate_all(page, ".myinfo_detail .detail_count")]
         alias = {"방문": "visit", "작성글": "article", "댓글": "comment"}
         total_count: TotalCount = {alias[key]: value for key, value in zip(keys, values) if key in alias}
-        today_count: TodayCount = dict(article=0, last_article_ts=None, comment=0, last_comment_ts=None)
-
         if total_only:
-            return dict(total=total_count, today=today_count)
+            return dict(total=total_count, today=None)
 
         try:
             page.tap("header .info_link"), wait(goto_delay)
             try:
-                today_count = _read_daily_log(page, today_count, goto_delay, today, my_articles)
+                default_count = dict(article=0, last_article_ts=None, comment=0, last_comment_ts=None)
+                today_count = _read_daily_log(page, default_count, goto_delay, today, my_articles)
             except:
-                pass
+                today_count = None
             finally:
                 close_info(page, goto_delay)
         except:
-            pass
+            today_count = None
         return dict(total=total_count, today=today_count)
     finally:
         page.touchscreen.tap(0, 0), wait(action_delay)
