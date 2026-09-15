@@ -184,8 +184,10 @@ def goto_cafe_url(
         goto_delay: Delay = (1, 3),
     ):
     path = f"https://{'m.' if mobile else 'www.'}cafe.naver.com/ca-fe/web/cafes"
-    url = f"{path}/{cafe_id}/menus/{menu_id}" if menu_id is not None else f"{path}/{cafe_id}"
-    page.goto(url), wait(goto_delay)
+    if (menu_id is None) or (str(menu_id) == '0'):
+        page.goto(f"{path}/{cafe_id}"), wait(goto_delay)
+    else:
+        page.goto(f"{path}/{cafe_id}/menus/{menu_id}"), wait(goto_delay)
 
 
 def go_back(page: Page, goto_delay: Delay = (1, 3)):

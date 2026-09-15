@@ -962,7 +962,8 @@ class Farmer(BrowserController):
         cafe = self.config.cafe.src if target == "src" else self.config.cafe.dst
         try:
             goto_cafe(self.page, cafe.name, self.delays.goto), wait(self.delays.goto) # Action 1
-            goto_menu(self.page, cafe.menu, **self.delays2), wait(self.delays.goto) # Action 2
+            if cafe.menu not in ("전체 게시판", f"'{cafe.name}' 홈"):
+                goto_menu(self.page, cafe.menu, **self.delays2), wait(self.delays.goto) # Action 2
         except (Exception if target == "src" else CafeNotLoadedError) as error:
             try:
                 goto_cafe_url(self.page, cafe.id, cafe.menu_id, self.mobile, self.delays.goto)
