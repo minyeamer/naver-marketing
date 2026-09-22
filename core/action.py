@@ -612,6 +612,9 @@ def write_article(
     else:
         article = create_article(articles, my_articles, **prompt, verbose=verbose, **kwargs) # Agent 4
 
+    if not article:
+        return dict()
+
     title_area = page.locator(".ArticleWriteFormSubject textarea").first
     title_area.tap(), wait(action_delay)
     title_area.type(article["title"], delay=100), wait(action_delay)

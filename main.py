@@ -8,8 +8,9 @@ if getattr(sys, "frozen", False):
         _base, "playwright", "driver", "package", ".local-browsers"
     )
 
-from task.farm import Farmer, MaxRetries, QuiteTime
+from task.farm import Farmer, MaxRetries, QuietTime
 from task.profile import ProfileManager
+from task.visit import Visitor
 
 from core.action import Wpm
 from core.browser import MOBILE_DEVICE
@@ -50,12 +51,13 @@ class ReadConfig(TypedDict, total=False):
     openai_key: str | Path
     adb_path: str | Path | None
     mobile: bool
-    quiet_time: QuiteTime
+    quiet_time: QuietTime
     comment_threshold: float
     like_threshold: float
     write_threshold: float
     dst_wpm: Wpm
     src_wpm: Wpm
+    run_label: str | None
 
 class FarmConfig(TypedDict, total=False):
     max_retries: MaxRetries
@@ -75,6 +77,14 @@ class ProfileConfig(TypedDict, total=False):
     prompt_close: bool
     skip_if_logged_in: bool
     wait_interval: float
+
+class VisitConfig(TypedDict, total=False):
+    max_retries: MaxRetries
+    task_delay: float
+    action_delay: float
+    # vpn_delay: float
+    verbose: int | str | Path
+    save_log: bool
 
 
 def read_configs(config_path: str | Path | None = None) -> dict:
@@ -118,10 +128,28 @@ def run_profile(
     return manager
 
 
+def run_visit(
+        browser: BrowserConfig,
+        read: ReadConfig,
+        visit: VisitConfig,
+        # vpn: VpnConfig,
+        write: WorksheetConnection = dict(),
+        slack: SlackConfig = dict(),
+        **kwargs
+    ) -> Visitor:
+    visitor = Visitor(**browser, **read, write_config=write, slack_config=slack)
+    visitor.start(**visit)
+    return visitor
+
+
 if __name__ == "__main__":
     configs = read_configs()
     mode = configs.pop("mode", "farm")
-    if mode == "profile":
-        run_profile(**configs)
-    else:
+    if mode == "farm":
         run_farm(**configs)
+    elif mode == "profile":
+        run_profile(**configs)
+    elif mode == "visit":
+        run_visit(**configs)
+    else:
+        raise ValueError(f"지원하는 모드가 아닙니다: '{mode}'")

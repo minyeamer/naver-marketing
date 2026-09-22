@@ -430,7 +430,7 @@ def create_article(
 
     try:
         article = chat_json(model or "gpt-5.4-mini", messages, name, verbose, **kwargs)
-        if not article.get("violation_reason"):
+        if article["title"] and article["contents"] and (not article.get("violation_reason")):
             article["created_at"] = dt.datetime.now().strftime("%Y-%m-%dT%H:%M:%S") + "+09:00"
             return article
     except Exception as e:
