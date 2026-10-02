@@ -317,7 +317,8 @@ def goto_article(page: Page, id: str | int | Literal["random"], goto_delay: Dela
     articles = locate_all(page, ".mainLink", **get_cafe_ranges(page, header=True, tab=True))
     if isinstance(id, int):
         articles[id].tap(), wait(goto_delay)
-    if id == "random":
+        return True
+    elif id == "random":
         random.choice(articles).tap(), wait(goto_delay)
         return True
 

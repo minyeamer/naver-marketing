@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from core.action import CafeBannedError, CafeNotFoundError, goto_cafe_url, read_action_log
+from core.action import CafeBannedError, CafeNotFoundError
+from core.action import goto_cafe_url, goto_article, go_back, read_action_log
 from core.browser import BrowserController, ProfileNotFoundError
 from core.login import NaverLoginError, NaverLoginFailedError, ReCaptchaRequiredError, WarningAccountError
 
@@ -363,7 +364,10 @@ class Visitor(BrowserController):
     @BrowserController.with_chrome_profile
     def do_visit(self, **kwargs):
         self.notify_playwright_proxy(**kwargs)
+
         goto_cafe_url(self.page, self.config.cafe_id, None, self.mobile, self.delays.goto)
+        goto_article(self.page, id="random", goto_delay=self.delays.goto)
+        go_back(self.page, self.delays.goto)
 
         action_log = read_action_log(self.page, total_only=True, **self.delays2)
         if isinstance(visit_count := action_log["total"].get("visit"), int):
