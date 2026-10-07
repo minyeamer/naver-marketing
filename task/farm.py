@@ -160,6 +160,8 @@ class Config(TypedDict):
     daily_article_limit: int
     like_count: str
     min_line_limit: int
+    max_line_limit: int
+    article_similarity: str
     comment_length: str
     read_articles_commented_only: bool
     reply_yn: bool
@@ -189,10 +191,11 @@ class ActionLimit(TypedDict):
     daily_comment: int
     daily_article: int
     min_line: int
+    max_line: int
 
 class WordLength(TypedDict):
-    # title: str
-    # contents: str
+    title: str
+    contents: str
     comment: str
 
 class ActionStatus(TypedDict):
@@ -236,6 +239,7 @@ class ConfigWrapper(AttrDict):
         self.delay: ActionDelay = {key[:-len("_delay")]: to_seconds(config[key]) for key in config.keys() if key.endswith("_delay")}
         self.limit: ActionLimit = {key[:-len("_limit")]: safe_int(config[key]) for key in config.keys() if key.endswith("_limit")}
         self.length: WordLength = {key[:-len("_length")]: config[key] for key in config.keys() if key.endswith("_length")}
+        self.article_similarity: str = config["article_similarity"]
         self.read_articles_commented_only: bool = config["read_articles_commented_only"]
         self.reply_yn: bool = config["reply_yn"]
 
@@ -401,9 +405,12 @@ class LogTableRow(TypedDict):
     read_ids: str
     read_articles: int
     new_article_count: int
+    new_article_limit: int
     new_comment_count: int
+    new_comment_limit: int
     new_reply_count: int
     new_like_count: int
+    new_like_limit: int
     total_steps: int
     error_flag: ErrorFlag
 
@@ -871,6 +878,8 @@ class Farmer(BrowserController):
             return None
         elif len(contents["lines"]) < self.config.limit["min_line"]:
             return None
+        elif len(contents["lines"]) > self.config.limit["max_line"]:
+            return None
         elif len([content for content in contents["lines"] if content.startswith("![")]) != 0:
             return None
         else:
@@ -1119,8 +1128,11 @@ class Farmer(BrowserController):
         ) -> NewArticle | ModifiedArticle:
         info, new = dict(title=str(), contents=list(), comments=list(), created_at=str()), dict()
 
-        replacements = dict()
-        if action == "create":
+        if action == "modify":
+            replacements = dict(
+                similarity = (self.config.article_similarity or "70~90%"),
+            )
+        else:
             replacements = dict(
                 title_limit = (self.config.length.get("title") or "30자 이내"),
                 contents_limit = (self.config.length.get("contents") or "300자 이내"),
@@ -1391,9 +1403,12 @@ class Farmer(BrowserController):
                 read_ids = self.calculate_field(log, "read_ids"),
                 read_articles = self.calculate_field(log, "read_articles"),
                 new_article_count = self.calculate_field(log, "new_article_count"),
+                new_article_limit = config.get_initial_count("article"),
                 new_comment_count = self.calculate_field(log, "new_comment_count"),
+                new_comment_limit = config.get_initial_count("comment"),
                 new_reply_count = self.calculate_field(log, "new_reply_count"),
                 new_like_count = self.calculate_field(log, "new_like_count"),
+                new_like_limit = config.get_initial_count("like"),
                 total_steps = log.total_steps,
                 error_flag = self.calculate_field(log, "error_flag"),
             ))
