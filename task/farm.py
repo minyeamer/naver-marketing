@@ -472,7 +472,7 @@ class Farmer(BrowserController):
         self.threshold = ActionThreshold(comment_threshold, like_threshold, write_threshold)
         self.wpm: dict[Literal["dst", "src"], Wpm] = dict(dst=dst_wpm, src=src_wpm)
         self.run_label = run_label or str()
-        self.original_articles: set[tuple[CafeId, ArticleId]] = set()
+        self.used_articles: dict[str, set[tuple[CafeId, ArticleId]]] = {"write_article": set(), "write_comment": set()}
 
         self.slack = SlackClient(**slack_config) if slack_config else None
         # self.set_vpn_client(vpn_config)
@@ -809,7 +809,7 @@ class Farmer(BrowserController):
 
         if isinstance(new_article.get("origin"), int):
             origin = articles[new_article["origin"]]
-            self.original_articles.add((origin["clubid"], origin["articleid"]))
+            self.used_articles["write_article"].add((origin["clubid"], origin["articleid"]))
 
         return new_article
 
@@ -841,7 +841,7 @@ class Farmer(BrowserController):
             self.log.read_ids["src"].update(src_read_ids)
             for params in selected:
                 self.check_quiet_time()
-                if (params["clubid"], params["articleid"]) in self.original_articles:
+                if (params["clubid"], params["articleid"]) in self.used_articles["write_article"]:
                     continue
 
                 if goto_article(self.page, params["articleid"], self.delays.goto): # Action 4
@@ -926,8 +926,12 @@ class Farmer(BrowserController):
 
                 if goto_article(self.page, params["articleid"], self.delays.goto): # Action 4
                     try:
-                        activity = self.read_and_react(max_read_length, verbose, dry_run)
+                        article_id = (params["clubid"], params["articleid"])
+                        disable_comment = article_id in self.used_articles["write_comment"]
+                        activity = self.read_and_react(max_read_length, verbose, dry_run, disable_comment)
                         if activity:
+                            if activity.get("written_comment") and not dry_run:
+                                self.used_articles["write_comment"].add(article_id)
                             keys = ["title", "contents", "comments", "created_at"]
                             articles.append({key: activity[key] for key in keys})
                     finally:
@@ -1053,8 +1057,11 @@ class Farmer(BrowserController):
         return ((self.config.counter["comment"] > 0)
             and self.config.timer.gte("comment", self.config.delay["comment"]))
 
-    def is_comment_allowed(self) -> bool:
-        return (self.has_next_comment() and (random.uniform(0, 1) > self.threshold.comment))
+    def is_comment_allowed(self, disable_comment: bool = False) -> bool:
+        return ((not disable_comment)
+            and (self.page.locator(".btn.modify").count() == 0) # disable in my articles
+            and (self.has_next_comment()
+            and (random.uniform(0, 1) > self.threshold.comment)))
 
     def has_next_like(self) -> bool:
         return (self.config.counter["like"] > 0)
@@ -1075,15 +1082,16 @@ class Farmer(BrowserController):
             max_read_length: int = 500,
             verbose: int | str | Path = 0,
             dry_run: bool = False,
+            disable_comment: bool = False,
         ) -> ArticleActivity | None:
         word_count = read_article(self.page, contents_only=True)["word_count"]
         if word_count > max_read_length:
             return None
-        else:
-            comment: Comment = None
-            common = dict(page=self.page, wpm=self.wpm["dst"], verbose=verbose)
 
-        if self.is_comment_allowed():
+        comment: Comment = None
+        common = dict(page=self.page, wpm=self.wpm["dst"], verbose=verbose)
+
+        if self.is_comment_allowed(disable_comment):
             article, comment = read_article_and_write_comment(
                 **common,
                 prompt = self.get_prompt("create_comment", "dst",
