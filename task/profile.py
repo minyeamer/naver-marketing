@@ -13,7 +13,7 @@ from pathlib import Path
 import threading
 import time
 
-from typing import Sequence, TypeVar, TypedDict, TYPE_CHECKING
+from typing import get_type_hints, Sequence, TypeVar, TypedDict, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from typing import Any, Literal
@@ -218,7 +218,8 @@ class ProfileManager(BrowserController):
             head: int = 1,
         ) -> list[AccountWrapper]:
         client = WorksheetClient(self._get_credentials(account), key, sheet, head)
-        records = client.get_all_records()
+        str_keys = [i for i, type in enumerate(get_type_hints(Account).values(), start=1) if type == str]
+        records = client.get_all_records(numericise_ignore=str_keys)
         return [AccountWrapper(record) for record in records if record["userid"]]
 
     def _get_credentials(self, account: str | Path | Literal[":default:"] = ":default:") -> ServiceAccount:
